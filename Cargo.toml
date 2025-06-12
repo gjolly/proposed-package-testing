@@ -1,0 +1,11 @@
+[package]
+name = "proposed_package_testing"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["blocking", "json"] } # Consider removing 'blocking' feature if not used elsewhere, or just use async
+tempfile = "3"
+anyhow = "1"
