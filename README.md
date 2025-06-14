@@ -17,8 +17,15 @@ sudo apt install -y qemu-utils
 sudo modprobe nbd
 ```
 
+Run the tool with a remote image:
+
 ```bash
 sudo ./target/release/proposed_package_testing https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img walinuxagent
+```
+
+or with a local file:
+
+```bash
 sudo ./target/release/proposed_package_testing ./ubuntu-24.04-server-cloudimg-amd64.img walinuxagent
 ```
 
