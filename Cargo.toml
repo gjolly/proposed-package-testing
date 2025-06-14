@@ -9,3 +9,4 @@ tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.11", features = ["blocking", "json"] } # Consider removing 'blocking' feature if not used elsewhere, or just use async
 tempfile = "3"
 anyhow = "1"
+chrono = { version = "0.4.41" }
