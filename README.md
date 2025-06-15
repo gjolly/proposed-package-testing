@@ -13,7 +13,7 @@ cargo build --release
 Pre-requisites:
 
 ```bash
-sudo apt install -y qemu-utils
+sudo apt install -y qemu-utils systemd-container
 ```
 
 Run the tool with a remote image:
