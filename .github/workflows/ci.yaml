@@ -6,7 +6,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  CI:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -32,6 +32,7 @@ jobs:
       run: sudo ./tests/run-all-tests.sh
 
     - name: Build
+      if: github.ref_type == 'tag'
       run: cargo build --release
 
     - name: Release
