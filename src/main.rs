@@ -1,7 +1,7 @@
 // main.rs
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
-use std::env;
+use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -102,7 +102,7 @@ fn configure_dns(rootfs_dir: &PathBuf) -> Result<()> {
 fn restore_dns(rootfs_dir: &PathBuf) -> Result<()> {
     let resolv_conf_path = rootfs_dir.join("etc/resolv.conf");
     let resolv_conf_backup_path = rootfs_dir.join("etc/resolv.conf.bak");
-    if resolv_conf_backup_path.exists() {
+    if resolv_conf_backup_path.exists() || resolv_conf_backup_path.is_symlink() {
         println!("Restoring original resolv.conf from backup.");
         fs::rename(&resolv_conf_backup_path, &resolv_conf_path)
             .context("Failed to restore resolv.conf from backup")?;
@@ -118,6 +118,7 @@ fn enable_proposed_repository(rootfs_dir: &PathBuf) -> Result<()> {
         rootfs_dir.to_str().unwrap(),
         "apt-add-repository",
         "--yes",
+        "--no-update",
         "--uri",
         "http://archive.ubuntu.com/ubuntu/",
         "--pocket",
@@ -175,8 +176,32 @@ fn get_release(rootfs_dir: &PathBuf) -> Result<String> {
     Ok(release)
 }
 
-fn install_package(rootfs_dir: &PathBuf, package_name: &str) -> Result<()> {
-    let release = get_release(rootfs_dir)?;
+fn install_package(
+    rootfs_dir: &PathBuf,
+    package_name: &str,
+    release: &str,
+    proposed: bool,
+) -> Result<()> {
+    let package_name = if proposed {
+        println!("Enabling -proposed repository...");
+        enable_proposed_repository(&rootfs_dir)?;
+        &format!("{}/{}-proposed", package_name, release)
+    } else {
+        package_name
+    };
+
+    run_command(
+        "systemd-nspawn",
+        &[
+            "-D",
+            rootfs_dir.to_str().unwrap(),
+            "apt-get",
+            "update",
+            "-y",
+        ],
+        &format!("Failed to install package {}", package_name),
+    )?;
+
     run_command(
         "systemd-nspawn",
         &[
@@ -184,45 +209,117 @@ fn install_package(rootfs_dir: &PathBuf, package_name: &str) -> Result<()> {
             rootfs_dir.to_str().unwrap(),
             "apt-get",
             "install",
-            "-y", // Add -y for non-interactive
-            &format!("{}/{}-proposed", package_name, release),
+            "-y",
+            package_name,
         ],
         &format!("Failed to install package {}", package_name),
     )?;
+
+    if proposed {
+        println!("Disabling -proposed repository...");
+        disable_proposed_repository(&rootfs_dir)?;
+    }
     Ok(())
 }
 
-fn generate_lxd_metadata(package_name: &str, release: &str) -> Result<()> {
+fn generate_lxd_metadata(package_name: &str, release: &str, proposed: bool) -> Result<()> {
     let lxd_metadata = format!(
         r#"architecture: x86_64
 creation_date: {}
 properties:
-  description: "Ubuntu {} with {} from proposed"
+  description: "Ubuntu {} with {}{}"
   os: Ubuntu
   release: "{}"
 "#,
         Utc::now().timestamp(),
         release,
         package_name,
+        if proposed { " (proposed)" } else { "" },
         release
     );
 
     fs::write("metadata.yaml", lxd_metadata).context("Failed to write LXD metadata")
 }
 
+fn create_lxd_tarball(
+    image_path: PathBuf,
+    package_name: &str,
+    release: &str,
+    proposed: bool,
+) -> Result<()> {
+    // Generate LXD metadata
+    generate_lxd_metadata(package_name, release, proposed)?;
+
+    let tarball_name = image_path.clone().with_extension("tar.gz");
+    run_command(
+        "tar",
+        &[
+            "--transform",
+            &format!("flags=r;s/.*.img/rootfs.img/"),
+            "-czf",
+            tarball_name.to_str().unwrap(),
+            "metadata.yaml",
+            image_path.to_str().unwrap(),
+        ],
+        "Failed to create LXD tarball",
+    )?;
+
+    fs::remove_file("metadata.yaml").context("Failed to remove temporary metadata file")?;
+
+    Ok(())
+}
+
+/// Customize an Ubuntu cloud image by installing a package from the proposed repository.
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// Enable the -proposed repository and install the package from it
+    #[arg(long, short, default_value_t = false)]
+    proposed: bool,
+
+    /// Create an LXD tarball instead of a QCOW2 image
+    #[arg(long, short, default_value_t = false)]
+    lxd: bool,
+
+    /// URL or path to the Ubuntu cloud image
+    image_uri: String,
+    /// Name of the package to install from -proposed
+    package_name: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 3 {
-        eprintln!("Usage: {} <image_url> <package_name>", args[0]);
-        eprintln!("Example: sudo {} https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img htop", args[0]);
-        return Err(anyhow!("Missing arguments"));
+    // Set the panic hook to print the error message
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("Panic occurred: {:?}", panic_info);
+    }));
+
+    let cli = Cli::parse();
+
+    // Call the customize_image function
+    let image_info = customize_image(&cli.image_uri, &cli.package_name, cli.proposed).await?;
+
+    if cli.lxd {
+        // Generate LXD metadata
+        create_lxd_tarball(
+            image_info.image_path.clone(),
+            &cli.package_name,
+            &image_info.release,
+            cli.proposed,
+        )?;
+        fs::remove_file(image_info.image_path).context("Failed to remove temporary image file")?;
     }
 
-    let image_url = &args[1];
-    let package_name = &args[2];
+    Ok(())
+}
 
-    println!("Starting VM image processing for URL: {}", image_url);
+struct ImageInfo {
+    image_path: PathBuf,
+    release: String,
+}
+
+async fn customize_image(image_uri: &str, package_name: &str, proposed: bool) -> Result<ImageInfo> {
+    println!("Starting VM image processing for URL: {}", image_uri);
     println!("Package to install: {}", package_name);
 
     // Create a temporary directory for downloads and mounts
@@ -239,7 +336,7 @@ async fn main() -> Result<()> {
     };
 
     // Extract the image name from the UR/L
-    let image_name = image_url
+    let image_name = image_uri
         .split('/')
         .last()
         .unwrap()
@@ -247,18 +344,22 @@ async fn main() -> Result<()> {
 
     // Copy image to current directory
     // file format: {image_name}-{package_name}-proposed.img
-    let final_image_path = PathBuf::from(format!("{}_{}_proposed.img", image_name, package_name));
+    let proposed_tag = if proposed { "_proposed" } else { "" };
+    let final_image_path = PathBuf::from(format!(
+        "{}_{}{}.img",
+        image_name, package_name, proposed_tag
+    ));
 
     // Determine if image_url is a URL or a local file path
-    if image_url.starts_with("http://") || image_url.starts_with("https://") {
-        // Treat as local file path, copy to image_path
-        println!("Using local image file: {}", image_url);
-        fs::copy(image_url, &image_path)
-            .with_context(|| format!("Failed to copy local image file from {}", image_url))?;
-    } else {
+    if image_uri.starts_with("http://") || image_uri.starts_with("https://") {
         // Download the image from the URL
-        println!("Downloading image from URL: {}", image_url);
-        download_image(image_url, &image_path).await?;
+        println!("Downloading image from URL: {}", image_uri);
+        download_image(image_uri, &image_path).await?;
+    } else {
+        // Treat as local file path, copy to image_path
+        println!("Using local image file: {}", image_uri);
+        fs::copy(image_uri, &image_path)
+            .with_context(|| format!("Failed to copy local image file from {}", image_uri))?;
     }
 
     let release: String;
@@ -268,8 +369,6 @@ async fn main() -> Result<()> {
         // Mutate the cleanup_guard within the block
         let mut cleanup_guard = cleanup_guard;
         let nbd_device_path = "/dev/nbd0";
-
-        connect_image_to_nbd(&image_path, nbd_device_path)?;
 
         println!("Attaching image to loop device using qemu-nbd");
         connect_image_to_nbd(&image_path, nbd_device_path)?;
@@ -299,32 +398,24 @@ async fn main() -> Result<()> {
         configure_dns(&rootfs_dir)?;
 
         println!("Modifying image with systemd-nspawn");
-        println!("Enabling -proposed repository...");
-        enable_proposed_repository(&rootfs_dir)?;
-
         // Determine the release name from the image URL
         release = get_release(&rootfs_dir)?;
 
         // Install the specified package
         println!("Installing package: {}...", package_name);
-        install_package(&rootfs_dir, package_name)?;
-        println!(
-            "Package '{}' installed successfully from proposed.",
-            package_name
-        );
-
-        println!("Disabling -proposed repository...");
-        disable_proposed_repository(&rootfs_dir)?;
+        install_package(&rootfs_dir, package_name, &release, proposed)?;
+        println!("Package '{}' installed successfully.", package_name);
 
         restore_dns(&rootfs_dir)?;
     } // `cleanup_guard` is dropped here, triggering cleanup
 
     fs::copy(&image_path, &final_image_path)
         .context("Failed to copy image to current directory")?;
-    // Write lxd metadata
-    generate_lxd_metadata(package_name, &release)?;
-    println!("Custom image created: {}", final_image_path.display());
-    Ok(())
+
+    Ok(ImageInfo {
+        image_path: final_image_path,
+        release,
+    })
 }
 
 struct CleanupGuard {

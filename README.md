@@ -1,6 +1,6 @@
 # propose-package-testing
 
-Download an Ubuntu cloud-image and customize it to installs a package from the proposed pocket.
+Download an Ubuntu cloud-image and customize it to installs a given package.
 
 ## Build
 
@@ -14,7 +14,6 @@ Pre-requisites:
 
 ```bash
 sudo apt install -y qemu-utils
-sudo modprobe nbd
 ```
 
 Run the tool with a remote image:
@@ -29,6 +28,10 @@ or with a local file:
 sudo ./target/release/proposed_package_testing ./ubuntu-24.04-server-cloudimg-amd64.img walinuxagent
 ```
 
+Features:
+ * install a package from the proposed pocket, use `--proposed`
+ * build a ready-to-import LXD tarball with `--lxd`
+
 This will produce two files:
  * a new QCOW2 images
  * a `metadata.yaml` required to import the image in LXD.
@@ -38,8 +41,7 @@ This will produce two files:
 Import the image:
 
 ```bash
-tar --transform 'flags=r;s/.*.img/rootfs.img/' -czf image.tar.gz ./metadata.yaml ./ubuntu-24.04-server-cloudimg-amd64_walinuxagent_proposed.img
-lxc image import --alias ubuntu-proposed-testing ./image.tar.gz
+lxc image import --alias ubuntu-proposed-testing ./ubuntu-24.04-server-cloudimg-amd64_walinuxagent_proposed.tar.gz
 ```
 
 Start a VM with this image:
