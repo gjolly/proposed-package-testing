@@ -1,4 +1,4 @@
-name: Build and release
+name: Build, test and release
 
 on: push
 
@@ -21,6 +21,15 @@ jobs:
 
     - name: Format
       run: cargo fmt --check
+
+    - name: Debug Build
+      run: cargo build
+
+    - name: Test Dependencies
+      run: sudo apt update && sudo apt install -y qemu-utils
+
+    - name: Intergration tests
+      run: sudo ./tests/run-all-tests.sh
 
     - name: Build
       run: cargo build --release
