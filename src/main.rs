@@ -366,8 +366,11 @@ async fn customize_image(image_uri: &str, image_format: &str, package_name: &str
     } else {
         // Treat as local file path, copy to image_path
         println!("Using local image file: {}", image_uri);
-        fs::copy(image_uri, &image_path)
-            .with_context(|| format!("Failed to copy local image file from {}", image_uri))?;
+        run_command(
+            "cp",
+            &[image_uri, image_path.to_str().unwrap()],
+            &format!("Failed to copy local image file from {}", image_uri),
+        )?;
     }
 
     let release: String;
@@ -417,8 +420,11 @@ async fn customize_image(image_uri: &str, image_format: &str, package_name: &str
         restore_dns(&rootfs_dir)?;
     } // `cleanup_guard` is dropped here, triggering cleanup
 
-    fs::copy(&image_path, &final_image_path)
-        .context("Failed to copy image to current directory")?;
+    run_command(
+        "cp",
+        &[image_path.to_str().unwrap(), final_image_path.to_str().unwrap()],
+        "Failed to copy final image.",
+    )?;
 
     Ok(ImageInfo {
         image_path: final_image_path,
