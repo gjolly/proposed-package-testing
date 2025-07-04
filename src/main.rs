@@ -53,7 +53,7 @@ async fn download_image(url: &str, dest: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn connect_image_to_nbd(image_path: &PathBuf, nbd_device_path: &str) -> Result<()> {
+fn connect_image_to_nbd(image_path: &PathBuf, format: &str, nbd_device_path: &str) -> Result<()> {
     // Ensure the nbd kernel module is loaded
     run_command("modprobe", &["nbd"], "Failed to load nbd kernel module")
         .context("Failed to load nbd kernel module")?;
@@ -61,7 +61,7 @@ fn connect_image_to_nbd(image_path: &PathBuf, nbd_device_path: &str) -> Result<(
     // Connect the image to the NBD device
     run_command(
         "qemu-nbd",
-        &["-c", nbd_device_path, image_path.to_str().unwrap()],
+        &["--format", format, "--connect", nbd_device_path, image_path.to_str().unwrap()],
         "Failed to connect image to NBD device",
     )
     .context("Failed to connect image to NBD device")?;
@@ -285,6 +285,10 @@ struct Cli {
     image_uri: String,
     /// Name of the package to install from -proposed
     package_name: String,
+
+    /// Format of the binary image (qcow2, raw, vpc...)
+    #[arg(long, default_value_t = String::from("qcow2"))]
+    image_format: String,
 }
 
 #[tokio::main]
@@ -297,9 +301,13 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Call the customize_image function
-    let image_info = customize_image(&cli.image_uri, &cli.package_name, cli.proposed).await?;
+    let image_info = customize_image(&cli.image_uri, &cli.image_format, &cli.package_name, cli.proposed).await?;
 
     if cli.lxd {
+        if cli.image_format != "qcow2" {
+            return Err(anyhow!("Cannot create LXD tarbal from '{}' image", cli.image_format));
+        }
+
         // Generate LXD metadata
         create_lxd_tarball(
             image_info.image_path.clone(),
@@ -318,7 +326,7 @@ struct ImageInfo {
     release: String,
 }
 
-async fn customize_image(image_uri: &str, package_name: &str, proposed: bool) -> Result<ImageInfo> {
+async fn customize_image(image_uri: &str, image_format: &str, package_name: &str, proposed: bool) -> Result<ImageInfo> {
     println!("Starting VM image processing for URL: {}", image_uri);
     println!("Package to install: {}", package_name);
 
@@ -371,7 +379,7 @@ async fn customize_image(image_uri: &str, package_name: &str, proposed: bool) ->
         let nbd_device_path = "/dev/nbd0";
 
         println!("Attaching image to loop device using qemu-nbd");
-        connect_image_to_nbd(&image_path, nbd_device_path)?;
+        connect_image_to_nbd(&image_path, image_format, nbd_device_path)?;
 
         cleanup_guard.nbd_device_path = Some(nbd_device_path.to_string());
 
