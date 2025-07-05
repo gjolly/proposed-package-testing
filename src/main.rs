@@ -2,6 +2,7 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use clap::Parser;
+use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -500,6 +501,20 @@ async fn customize_image(
         ],
         "Failed to copy final image.",
     )?;
+
+    // If the user is running the command with "sudo", they
+    // probably don't want the final artifact to be owned
+    // by the root user.
+    if let Ok(user) = env::var("SUDO_USER") {
+        let _ = run_command(
+            "chown",
+            &[
+                &format!("{}:{}", user, user),
+                final_image_path.to_str().unwrap(),
+            ],
+            "Failed to change ownership of the final artifact",
+        );
+    }
 
     Ok(ImageInfo {
         image_path: final_image_path,
