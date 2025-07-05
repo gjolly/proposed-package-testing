@@ -103,4 +103,3 @@ az vm create \
  * Updating the booloader or any of the boot assets is currently not supported as `update-grub` will not work.
  * Installing Snaps is currently not supported.
  * Only amd64 is currently supported.
- * Only QCOW2 images and LXD tarballs are supported for now.
