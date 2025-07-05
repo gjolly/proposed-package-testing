@@ -36,6 +36,7 @@ sudo proposed_package_testing ./ubuntu-24.04-server-cloudimg-amd64.img walinuxag
 
 Features:
  * install a package from the proposed pocket, use `--proposed`
+ * install a package from a PPA with `--ppa ppa:owner/name`
  * build a ready-to-import LXD tarball with `--lxd`
 
 ## Use the image with LXD
