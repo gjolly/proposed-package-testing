@@ -61,7 +61,13 @@ fn connect_image_to_nbd(image_path: &PathBuf, format: &str, nbd_device_path: &st
     // Connect the image to the NBD device
     run_command(
         "qemu-nbd",
-        &["--format", format, "--connect", nbd_device_path, image_path.to_str().unwrap()],
+        &[
+            "--format",
+            format,
+            "--connect",
+            nbd_device_path,
+            image_path.to_str().unwrap(),
+        ],
         "Failed to connect image to NBD device",
     )
     .context("Failed to connect image to NBD device")?;
@@ -301,11 +307,20 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Call the customize_image function
-    let image_info = customize_image(&cli.image_uri, &cli.image_format, &cli.package_name, cli.proposed).await?;
+    let image_info = customize_image(
+        &cli.image_uri,
+        &cli.image_format,
+        &cli.package_name,
+        cli.proposed,
+    )
+    .await?;
 
     if cli.lxd {
         if cli.image_format != "qcow2" {
-            return Err(anyhow!("Cannot create LXD tarbal from '{}' image", cli.image_format));
+            return Err(anyhow!(
+                "Cannot create LXD tarbal from '{}' image",
+                cli.image_format
+            ));
         }
 
         // Generate LXD metadata
@@ -326,7 +341,12 @@ struct ImageInfo {
     release: String,
 }
 
-async fn customize_image(image_uri: &str, image_format: &str, package_name: &str, proposed: bool) -> Result<ImageInfo> {
+async fn customize_image(
+    image_uri: &str,
+    image_format: &str,
+    package_name: &str,
+    proposed: bool,
+) -> Result<ImageInfo> {
     println!("Starting VM image processing for URL: {}", image_uri);
     println!("Package to install: {}", package_name);
 
@@ -422,7 +442,10 @@ async fn customize_image(image_uri: &str, image_format: &str, package_name: &str
 
     run_command(
         "cp",
-        &[image_path.to_str().unwrap(), final_image_path.to_str().unwrap()],
+        &[
+            image_path.to_str().unwrap(),
+            final_image_path.to_str().unwrap(),
+        ],
         "Failed to copy final image.",
     )?;
 
