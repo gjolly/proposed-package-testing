@@ -118,6 +118,42 @@ fn restore_dns(rootfs_dir: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+fn add_ppa(rootfs_dir: &PathBuf, ppa: &str) -> Result<()> {
+    let apt_add_repo_args = vec![
+        "-D",
+        rootfs_dir.to_str().unwrap(),
+        "apt-add-repository",
+        "--no-update",
+        "--yes",
+        ppa,
+    ];
+
+    run_command(
+        "systemd-nspawn",
+        &apt_add_repo_args,
+        "Failed to add proposed repository",
+    )?;
+    Ok(())
+}
+
+fn remove_ppa(rootfs_dir: &PathBuf, ppa: &str) -> Result<()> {
+    let apt_add_repo_args = vec![
+        "-D",
+        rootfs_dir.to_str().unwrap(),
+        "apt-add-repository",
+        "--yes",
+        "--remove",
+        ppa,
+    ];
+
+    run_command(
+        "systemd-nspawn",
+        &apt_add_repo_args,
+        "Failed to add proposed repository",
+    )?;
+    Ok(())
+}
+
 fn enable_proposed_repository(rootfs_dir: &PathBuf) -> Result<()> {
     let apt_add_repo_args = vec![
         "-D",
@@ -187,6 +223,7 @@ fn install_package(
     package_name: &str,
     release: &str,
     proposed: bool,
+    ppa: Option<String>,
 ) -> Result<()> {
     let package_name = if proposed {
         println!("Enabling -proposed repository...");
@@ -195,6 +232,11 @@ fn install_package(
     } else {
         package_name
     };
+
+    if let Some(ppa_name) = ppa.as_ref() {
+        println!("Adding ppa {}", &ppa_name);
+        add_ppa(&rootfs_dir, &ppa_name)?;
+    }
 
     run_command(
         "systemd-nspawn",
@@ -224,6 +266,10 @@ fn install_package(
     if proposed {
         println!("Disabling -proposed repository...");
         disable_proposed_repository(&rootfs_dir)?;
+    }
+    if let Some(ppa_name) = ppa.as_ref() {
+        println!("Removing PPA {}", &ppa_name);
+        remove_ppa(&rootfs_dir, &ppa_name)?;
     }
     Ok(())
 }
@@ -295,6 +341,10 @@ struct Cli {
     /// Format of the binary image (qcow2, raw, vpc...)
     #[arg(long, default_value_t = String::from("qcow2"))]
     image_format: String,
+
+    /// Enable this PPA before installing package
+    #[arg(long, value_name = "ppa:owner/name")]
+    ppa: Option<String>,
 }
 
 #[tokio::main]
@@ -312,6 +362,7 @@ async fn main() -> Result<()> {
         &cli.image_format,
         &cli.package_name,
         cli.proposed,
+        cli.ppa,
     )
     .await?;
 
@@ -346,6 +397,7 @@ async fn customize_image(
     image_format: &str,
     package_name: &str,
     proposed: bool,
+    ppa: Option<String>,
 ) -> Result<ImageInfo> {
     println!("Starting VM image processing for URL: {}", image_uri);
     println!("Package to install: {}", package_name);
@@ -434,7 +486,7 @@ async fn customize_image(
 
         // Install the specified package
         println!("Installing package: {}...", package_name);
-        install_package(&rootfs_dir, package_name, &release, proposed)?;
+        install_package(&rootfs_dir, package_name, &release, proposed, ppa)?;
         println!("Package '{}' installed successfully.", package_name);
 
         restore_dns(&rootfs_dir)?;
