@@ -34,6 +34,16 @@ jobs:
           echo "PPA=$ppa" >> $GITHUB_ENV
           echo "PROPOSED=$proposed" >> $GITHUB_ENV
 
+      - name: Post start message to issue
+        run: |
+          ISSUE=${{ github.event.issue.number }}
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          gh api repos/${{ github.repository }}/issues/$ISSUE/comments \
+            -f body="🛠️ Build started for \`${{ env.PACKAGE }}\` on \`${{ env.RELEASE }}\`: $RUN_URL"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install dependencies
         run: |
           sudo apt-get update
