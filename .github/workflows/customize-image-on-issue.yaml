@@ -1,0 +1,98 @@
+name: Build Image from Issue
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  gated-build:
+    name: Gated Build on Approval
+    if: contains(github.event.label.name, 'build-request')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Parse issue body
+        id: parse
+        run: |
+          echo "${{ github.event.issue.body }}" > body.txt
+          release=$(grep -oP 'release=\K\S+' body.txt)
+          package=$(grep -oP 'package=\K\S+' body.txt)
+          ppa=$(grep -oP 'ppa=\K\S+' body.txt || true)
+          proposed=$(grep -oP 'proposed=\K\S+' body.txt || echo "false")
+
+          if [ -z "$release" ] || [ -z "$package" ]; then
+            echo "::error ::Missing required fields"
+            exit 1
+          fi
+
+          echo "RELEASE=$release" >> $GITHUB_ENV
+          echo "PACKAGE=$package" >> $GITHUB_ENV
+          echo "PPA=$ppa" >> $GITHUB_ENV
+          echo "PROPOSED=$proposed" >> $GITHUB_ENV
+
+      - name: Download latest release binary
+        run: |
+          GH_REPO="${{ github.repository }}"
+          ASSET_NAME="proposed_package_testing"
+          
+          echo "Fetching latest release from $GH_REPO..."
+
+          latest_url=$(curl -v -sL "https://api.github.com/repos/$GH_REPO/releases/latest" \
+            | jq -r ".assets[] | select(.name == \"$ASSET_NAME\") | .browser_download_url")
+
+          if [ -z "$latest_url" ]; then
+            echo "Asset $ASSET_NAME not found in latest release"
+            exit 1
+          fi
+
+          echo "Downloading binary from: $latest_url"
+          curl -L -o $ASSET_NAME "$latest_url"
+          chmod +x $ASSET_NAME
+
+      - name: Download Ubuntu cloud image
+        run: |
+          IMAGE_NAME="ubuntu-${{ env.RELEASE }}-server-cloudimg-amd64.img"
+          IMAGE_URL="https://cloud-images.ubuntu.com/releases/${{ env.RELEASE }}/release/${IMAGE_NAME}"
+          curl -LO "$IMAGE_URL"
+          echo "Downloaded image: $IMAGE_NAME"
+
+      - name: Run proposed_package_testing
+        run: |
+          CMD="./proposed_package_testing"
+          IMAGE="./ubuntu-${{ env.RELEASE }}-server-cloudimg-amd64.img"
+          ARGS=""
+
+          if [ "${{ env.PROPOSED }}" = "true" ]; then
+            ARGS="$ARGS --proposed"
+          fi
+
+          if [ -n "${{ env.PPA }}" ]; then
+            ARGS="$ARGS --ppa ${{ env.PPA }}"
+          fi
+
+          sudo $CMD $ARGS "$IMAGE" "${{ env.PACKAGE }}"
+
+          echo "Removing original image"
+          rm "$IMAGE"
+
+      - uses: actions/upload-artifact@v4
+        id: artifact-upload
+        with:
+          name: ubuntu_${{ env.RELEASE }}_${{ env.PACKAGE }}
+          retention-days: 1
+          path: '*.img'
+
+      - name: Comment and close issue
+        run: |
+          ISSUE=${{ github.event.issue.number }}
+          gh api repos/${{ github.repository }}/issues/$ISSUE/comments \
+          -f body="✅ Build complete. Download the image here: ${{ steps.artifact-upload.outputs.artifact-url }}"
+          gh api repos/${{ github.repository }}/issues/$ISSUE \
+            -X PATCH -f state=closed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
