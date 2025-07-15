@@ -7,35 +7,21 @@ body:
       value: |
         Please provide the following fields to request a build.
 
-  - type: input
-    id: release
+  - type: textarea
+    id: build_parameters
     attributes:
-      label: Ubuntu Release
-      description: Target Ubuntu release (e.g., 22.04, 24.04...)
+      label: Build parameters
+      description: |
+        Parameters for the image customization. Make sure to keep the same format.
+      render: shell
+      value:
+        # Ubuntu release to use (22.04, 24.04, ...)
+        release=24.04
+        # Package to install
+        package=your-package
+        # Optional: Enable -proposed before installing the package
+        # proposed=true
+        # Optional: Add a PPA before installing the package
+        # ppa=ppa:user/name
     validations:
       required: true
-
-  - type: input
-    id: package
-    attributes:
-      label: Package Name
-      description: Name of the package to install
-    validations:
-      required: true
-
-  - type: input
-    id: ppa
-    attributes:
-      label: PPA (Optional)
-      description: 'Example: ppa:myteam/edge'
-
-  - type: dropdown
-    id: proposed
-    attributes:
-      label: Enable proposed?
-      options:
-        - 'true'
-        - 'false'
-    validations:
-      required: true
-
