@@ -14,7 +14,7 @@ body:
       description: |
         Parameters for the image customization. Make sure to keep the same format.
       render: shell
-      value:
+      value: |
         # Ubuntu release to use (22.04, 24.04, ...)
         release=24.04
         # Package to install
