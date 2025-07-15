@@ -56,7 +56,7 @@ jobs:
       - name: Download Ubuntu cloud image
         run: |
           IMAGE_NAME="ubuntu-${{ inputs.release }}-server-cloudimg-amd64.img"
-          IMAGE_URL="https://cloud-images.ubuntu.com/releases/${{ inputs.release }}/release/${{ inputs.suite }}/current/${IMAGE_NAME}"
+          IMAGE_URL="https://cloud-images.ubuntu.com/releases/${{ inputs.release }}/release/${IMAGE_NAME}"
           curl -LO "$IMAGE_URL"
           echo "Downloaded image: $IMAGE_NAME"
 
