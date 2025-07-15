@@ -11,7 +11,7 @@ permissions:
 jobs:
   gated-build:
     name: Gated Build on Approval
-    if: contains(github.event.label.name, 'build-request')
+    if: contains(github.event.label.name, 'build-approved')
     runs-on: ubuntu-latest
 
     steps:

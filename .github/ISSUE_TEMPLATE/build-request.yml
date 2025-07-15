@@ -1,7 +1,7 @@
 name: Build Request
 description: Request a build of a custom image
 title: "Build Request: "
-labels: ["build-request-submission"]
+labels: ["build-request"]
 body:
   - type: markdown
     attributes:
