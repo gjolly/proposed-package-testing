@@ -41,7 +41,7 @@ jobs:
           
           echo "Fetching latest release from $GH_REPO..."
 
-          latest_url=$(curl -sL "https://api.github.com/repos/$GH_REPO/releases/latest" \
+          latest_url=$(curl -v -sL "https://api.github.com/repos/$GH_REPO/releases/latest" \
             | jq -r ".assets[] | select(.name == \"$ASSET_NAME\") | .browser_download_url")
 
           if [ -z "$latest_url" ]; then
