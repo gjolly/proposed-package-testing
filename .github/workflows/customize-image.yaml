@@ -1,0 +1,87 @@
+name: Build Proposed Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Ubuntu release (e.g., 22.04, 24.04)"
+        required: true
+        type: string
+      package:
+        description: "Package name to install"
+        required: true
+        type: string
+      ppa:
+        description: "Optional PPA (ppa:owner/name)"
+        required: false
+        type: string
+      proposed:
+        description: "Enable -proposed pocket?"
+        required: true
+        type: boolean
+
+jobs:
+  build-image:
+    name: Generate Image with Proposed Package
+    runs-on: ubuntu-latest
+    environment: protected
+    outputs:
+      image: ${{ steps.artifact-upload.outputs.artifact-url }}
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-utils systemd-container
+
+
+      - name: Download latest release binary
+        run: |
+          GH_REPO="${{ github.repository }}"
+          ASSET_NAME="proposed_package_testing"
+          
+          echo "Fetching latest release from $GH_REPO..."
+
+          latest_url=$(curl -sL "https://api.github.com/repos/$GH_REPO/releases/latest" \
+            | jq -r ".assets[] | select(.name == \"$ASSET_NAME\") | .browser_download_url")
+
+          if [ -z "$latest_url" ]; then
+            echo "Asset $ASSET_NAME not found in latest release"
+            exit 1
+          fi
+
+          echo "Downloading binary from: $latest_url"
+          curl -L -o $ASSET_NAME "$latest_url"
+          chmod +x $ASSET_NAME
+
+      - name: Download Ubuntu cloud image
+        run: |
+          IMAGE_NAME="ubuntu-${{ inputs.release }}-server-cloudimg-amd64.img"
+          IMAGE_URL="https://cloud-images.ubuntu.com/releases/${{ inputs.release }}/release/${{ inputs.suite }}/current/${IMAGE_NAME}"
+          curl -LO "$IMAGE_URL"
+          echo "Downloaded image: $IMAGE_NAME"
+
+      - name: Run proposed_package_testing
+        run: |
+          CMD="./proposed_package_testing"
+          IMAGE="./ubuntu-${{ inputs.release }}-server-cloudimg-amd64.img"
+          ARGS=""
+
+          if [ "${{ inputs.proposed }}" = "true" ]; then
+            ARGS="$ARGS --proposed"
+          fi
+
+          if [ -n "${{ inputs.ppa }}" ]; then
+            ARGS="$ARGS --ppa ${{ inputs.ppa }}"
+          fi
+
+          $CMD $ARGS "$IMAGE" "${{ inputs.package }}"
+
+          echo "Removing original image"
+          rm "$IMAGE"
+
+      - uses: actions/upload-artifact@v4
+        id: artifact-upload
+        with:
+          name: ${{ inputs.package }}_${{ inputs.release }}
+          retention-days: 1
+          path: '*.img'
