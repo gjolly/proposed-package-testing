@@ -27,7 +27,7 @@ body:
     id: ppa
     attributes:
       label: PPA (Optional)
-      description: Example: ppa:myteam/edge
+      description: 'Example: ppa:myteam/edge'
 
   - type: dropdown
     id: proposed
