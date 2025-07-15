@@ -74,7 +74,7 @@ jobs:
             ARGS="$ARGS --ppa ${{ inputs.ppa }}"
           fi
 
-          $CMD $ARGS "$IMAGE" "${{ inputs.package }}"
+          sudo $CMD $ARGS "$IMAGE" "${{ inputs.package }}"
 
           echo "Removing original image"
           rm "$IMAGE"
