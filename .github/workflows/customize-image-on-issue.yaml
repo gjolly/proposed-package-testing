@@ -21,10 +21,10 @@ jobs:
           RAW_BODY: ${{ github.event.issue.body }}
         run: |
           echo "$RAW_BODY" > body.txt
-          release=$(grep -oP 'release=\K\S+' body.txt)
-          package=$(grep -oP 'package=\K\S+' body.txt)
-          ppa=$(grep -oP 'ppa=\K\S+' body.txt || true)
-          proposed=$(grep -oP 'proposed=\K\S+' body.txt || echo "false")
+          release=$(grep -oP '^release=\K\S+' body.txt)
+          package=$(grep -oP '^package=\K\S+' body.txt)
+          ppa=$(grep -oP '^ppa=\K\S+' body.txt || true)
+          proposed=$(grep -oP '^proposed=\K\S+' body.txt || echo "false")
 
           if [ -z "$release" ] || [ -z "$package" ]; then
             echo "::error ::Missing required fields"
