@@ -1,0 +1,41 @@
+name: Build Request
+description: Request a build of a custom image
+title: "Build Request: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide the following fields to request a build.
+
+  - type: input
+    id: release
+    attributes:
+      label: Ubuntu Release
+      description: Target Ubuntu release (e.g., 22.04, 24.04...)
+    validations:
+      required: true
+
+  - type: input
+    id: package
+    attributes:
+      label: Package Name
+      description: Name of the package to install
+    validations:
+      required: true
+
+  - type: input
+    id: ppa
+    attributes:
+      label: PPA (Optional)
+      description: Example: ppa:myteam/edge
+
+  - type: dropdown
+    id: proposed
+    attributes:
+      label: Enable proposed?
+      options:
+        - true
+        - false
+    validations:
+      required: true
+
