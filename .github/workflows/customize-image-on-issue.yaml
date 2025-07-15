@@ -17,11 +17,10 @@ jobs:
     steps:
       - name: Parse issue body
         id: parse
+        env:
+          RAW_BODY: ${{ github.event.issue.body }}
         run: |
-          cat << EOF > body.txt
-          ${{ github.event.issue.body }}
-          EOF
-
+          echo "$RAW_BODY" > body.txt
           release=$(grep -oP 'release=\K\S+' body.txt)
           package=$(grep -oP 'package=\K\S+' body.txt)
           ppa=$(grep -oP 'ppa=\K\S+' body.txt || true)
