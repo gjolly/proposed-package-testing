@@ -14,6 +14,12 @@ cargo install --git https://github.com/gjolly/proposed-package-testing
 
 ## Usage
 
+### Github Workflow
+
+A Github Workflow has been configured on this repository to allow anyone to request for a build through a Github Issue. To use it, create [a new issue](https://github.com/gjolly/proposed-package-testing/issues/new/choose) and select "Build Request". Follow the instructions to configure the build. Once the issue created, it will be tagged with `build-request`. Wait for a maintainer to review your request and to tag is with `build-approved`. The build will be automatically triggered and you should get a link to download your image, example: .
+
+### Manual
+
 Pre-requisites:
 
 ```bash
