@@ -1,4 +1,4 @@
-name: Build Proposed Image
+name: Customize Ubuntu Image
 
 on:
   workflow_dispatch:
