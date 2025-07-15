@@ -34,8 +34,8 @@ body:
     attributes:
       label: Enable proposed?
       options:
-        - true
-        - false
+        - 'true'
+        - 'false'
     validations:
       required: true
 
