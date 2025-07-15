@@ -20,8 +20,8 @@ body:
         # Package to install
         package=your-package
         # Optional: Enable -proposed before installing the package
-        # proposed=true
+        #proposed=true
         # Optional: Add a PPA before installing the package
-        # ppa=ppa:user/name
+        #ppa=ppa:user/name
     validations:
       required: true
