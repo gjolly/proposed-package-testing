@@ -24,7 +24,7 @@ To use it:
  * Wait for a maintainer to review your request and to tag is with `build-approved`. The build will be automatically triggered.
  * Once the build is done, you should get a link to download your image.
 
-Example: https://github.com/gjolly/proposed-package-testing/issues/14.
+Example: https://github.com/gjolly/proposed-package-testing/issues/15.
 
 ### Manual
 
